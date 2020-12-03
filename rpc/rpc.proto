@@ -1,0 +1,68 @@
+syntax = "proto3";
+option go_package = "github.com/dhcmrlchtdj/raftoy/rpc";
+
+package rpc;
+
+service RaftRpc {
+    // basic
+    rpc AppendEntries(ReqAppendEntries) returns (RespAppendEntries) {
+    }
+    rpc RequestVote(ReqRequestVote) returns (RespRequestVote) {
+    }
+
+    // extend
+    rpc PreVote(Request) returns (Response) {
+    }
+    rpc TimeoutNow(Request) returns (Response) {
+    }
+
+    // membership
+    rpc AddServer(Request) returns (Response) {
+    }
+    rpc RemoveServer(Request) returns (Response) {
+    }
+
+    // client
+    rpc RegisterClient(Request) returns (Response) {
+    }
+    rpc ClientRequest(Request) returns (Response) {
+    }
+    rpc ClientQuery(Request) returns (Response) {
+    }
+}
+
+message ReqAppendEntries {
+    uint64 term = 1;
+    string leaderId = 2;
+    uint64 prevLogIndex = 3;
+    uint64 prevLogTerm = 4;
+    uint64 leaderCommit = 5;
+    repeated Entry entries = 6;
+}
+message Entry {
+    uint64 term = 1;
+    uint64 index = 2;
+    string command = 3;
+}
+message RespAppendEntries {
+    uint64 term = 1;
+    bool success = 2;
+}
+message ReqRequestVote {
+    uint64 term = 1;
+    string candidateId = 2;
+    uint64 lastLogIndex = 3;
+    uint64 lastLogTerm = 4;
+}
+message RespRequestVote {
+    uint64 term = 1;
+    bool voteGranted = 2;
+}
+
+message Request {
+    string r = 1;
+}
+
+message Response {
+    string r = 1;
+}
