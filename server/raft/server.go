@@ -211,10 +211,12 @@ func (s *Server) onCommitIndexUpdate() {
 ///
 
 func (s *Server) becomeFollower(term TermID, votedFor string) {
+	if s.role != Follower {
+		fmt.Printf("%v become follower\n", s.getInfo())
+	}
 	s.currentTerm = term
 	s.role = Follower
 	s.votedFor = votedFor
-	fmt.Printf("%v become follower\n", s.getInfo())
 	s.resetElectronTimeoutTick()
 }
 
@@ -448,8 +450,8 @@ func (s *Server) onReqAppendEntries(req *rpc.ReqAppendEntries) *rpc.RespAppendEn
 		return resp
 	}
 
-	if req.Term > s.currentTerm {
-		s.becomeFollower(req.Term, "")
+	if req.Term > s.currentTerm || s.votedFor != req.LeaderId {
+		s.becomeFollower(req.Term, req.LeaderId)
 		resp.Term = s.currentTerm
 	}
 
