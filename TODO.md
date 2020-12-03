@@ -1,10 +1,11 @@
-# RPC
-- [x] AppendEntries
-- [x] RequestVote
-- [x] PreVote
-- [ ] TimeoutNow
-- [ ] AddServer
-- [ ] RemoveServer
-- [ ] RegisterClient
-- [ ] ClientRequest
-- [ ] ClientQuery
+- [x] AppendEntries RPC
+- [x] RequestVote RPC
+- [x] PreVote RPC
+- [ ] TimeoutNow RPC
+- [ ] AddServer RPC
+- [ ] RemoveServer RPC
+- [ ] RegisterClient RPC
+- [ ] ClientRequest RPC
+- [ ] ClientQuery RPC
+- [ ] Persistence
+- [ ] Log Compaction
