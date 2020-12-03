@@ -3,6 +3,8 @@ option go_package = "github.com/dhcmrlchtdj/raftoy/rpc";
 
 package rpc;
 
+///
+
 service RaftRpc {
     // basic
     rpc AppendEntries(ReqAppendEntries) returns (RespAppendEntries) {
@@ -11,25 +13,27 @@ service RaftRpc {
     }
 
     // extend
-    rpc PreVote(Request) returns (Response) {
+    rpc PreVote(ReqPreVote) returns (RespPreVote) {
     }
-    rpc TimeoutNow(Request) returns (Response) {
+    rpc TimeoutNow(ReqTimeoutNow) returns (RespTimeoutNow) {
     }
 
     // membership
-    rpc AddServer(Request) returns (Response) {
+    rpc AddServer(ReqAddServer) returns (RespServer) {
     }
-    rpc RemoveServer(Request) returns (Response) {
+    rpc RemoveServer(ReqRemoveServer) returns (RespServer) {
     }
 
     // client
-    rpc RegisterClient(Request) returns (Response) {
+    rpc RegisterClient(ReqRegisterClient) returns (RespClient) {
     }
-    rpc ClientRequest(Request) returns (Response) {
+    rpc ClientRequest(ReqClientRequest) returns (RespClient) {
     }
-    rpc ClientQuery(Request) returns (Response) {
+    rpc ClientQuery(ReqClientQuery) returns (RespClient) {
     }
 }
+
+///
 
 message ReqAppendEntries {
     uint64 term = 1;
@@ -48,6 +52,9 @@ message RespAppendEntries {
     uint64 term = 1;
     bool success = 2;
 }
+
+///
+
 message ReqRequestVote {
     uint64 term = 1;
     string candidateId = 2;
@@ -59,10 +66,68 @@ message RespRequestVote {
     bool voteGranted = 2;
 }
 
-message Request {
-    string r = 1;
+///
+
+message ReqPreVote {
+    uint64 term = 1;
+    uint64 lastLogIndex = 3;
+    uint64 lastLogTerm = 4;
+}
+message RespPreVote {
+    uint64 term = 1;
+    bool success = 2;
 }
 
-message Response {
-    string r = 1;
+///
+
+message ReqTimeoutNow {
+    // TODO
+}
+message RespTimeoutNow {
+    // TODO
+}
+
+///
+
+message ReqAddServer {
+    string newServer = 1;
+}
+
+message ReqRemoveServer {
+    string oldServer = 1;
+}
+
+message RespServer {
+    enum Status {
+        OK = 0;
+        TIMEOUT = 1;
+    }
+    Status status = 1;
+    optional string leaderHint = 2;
+}
+
+///
+
+message ReqRegisterClient {
+}
+
+message ReqClientRequest {
+    string clientId = 1;
+    uint64 sequenceNum = 2;
+    string command = 3;
+}
+
+message ReqClientQuery {
+    string query = 1;
+}
+
+message RespClient {
+    enum Status {
+        OK = 0;
+        NOT_LEADER = 1;
+        SESSION_EXPIRED = 2;
+    }
+    Status status = 1;
+    string response = 2;
+    string leaderHint = 3;
 }

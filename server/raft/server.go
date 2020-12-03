@@ -112,16 +112,16 @@ func (s *Server) getInfo() string {
 
 ///
 
+func (s *Server) Start() {
+	go s.loopTick()
+	go s.loopEvent()
+}
+
 func (s *Server) Stop() {
 	s.quitOnce.Do(func() {
 		close(s.quitSignal)
 		s.quitWait.Wait()
 	})
-}
-
-func (s *Server) Start() {
-	go s.loopTick()
-	go s.loopEvent()
 }
 
 func (s *Server) DispatchEvent(evt *Event) {
@@ -131,6 +131,8 @@ func (s *Server) DispatchEvent(evt *Event) {
 	case s.eventhub <- evt:
 	}
 }
+
+///
 
 func (s *Server) loopTick() {
 	s.quitWait.Add(1)
@@ -338,8 +340,6 @@ func (s *Server) broadcastHeartbeat() {
 		s.sendAppendEntries(peer, 0)
 	}
 }
-
-///
 
 func (s *Server) sendAppendEntries(peer string, size int) {
 	client, err := s.getPeerClient(peer)
