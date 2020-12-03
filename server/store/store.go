@@ -38,7 +38,7 @@ func (s *Store) Del(key string) {
 	delete(s.kv, key)
 }
 
-func (s *Store) toJSON() []byte {
+func (s *Store) ToJSON() []byte {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -49,7 +49,7 @@ func (s *Store) toJSON() []byte {
 	return data
 }
 
-func (s *Store) loadJSON(data []byte) {
+func (s *Store) LoadJSON(data []byte) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

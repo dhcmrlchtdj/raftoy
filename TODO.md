@@ -1,7 +1,7 @@
 - [x] AppendEntries RPC
 - [x] RequestVote RPC
 - [x] PreVote RPC
-- [ ] TimeoutNow RPC
+- [x] TimeoutNow RPC
 - [ ] AddServer RPC
 - [ ] RemoveServer RPC
 - [ ] RegisterClient RPC

@@ -43,11 +43,13 @@ message ReqAppendEntries {
     uint64 leaderCommit = 5;
     repeated Entry entries = 6;
 }
+
 message Entry {
     uint64 term = 1;
     uint64 index = 2;
     string command = 3;
 }
+
 message RespAppendEntries {
     uint64 term = 1;
     bool success = 2;
@@ -61,6 +63,7 @@ message ReqRequestVote {
     uint64 lastLogIndex = 3;
     uint64 lastLogTerm = 4;
 }
+
 message RespRequestVote {
     uint64 term = 1;
     bool voteGranted = 2;
@@ -74,6 +77,7 @@ message ReqPreVote {
     uint64 lastLogIndex = 3;
     uint64 lastLogTerm = 4;
 }
+
 message RespPreVote {
     uint64 term = 1;
     bool success = 2;
@@ -82,10 +86,10 @@ message RespPreVote {
 ///
 
 message ReqTimeoutNow {
-    // TODO
 }
+
 message RespTimeoutNow {
-    // TODO
+    bool success = 1;
 }
 
 ///
