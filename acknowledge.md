@@ -1,0 +1,4 @@
+- https://github.com/ongardie/dissertation
+- https://pdos.csail.mit.edu/6.824/labs/lab-raft.html
+- https://thesquareplanet.com/blog/students-guide-to-raft/
+- https://flaneur2020.github.io/2020/11/07/mit6-824-raft/
