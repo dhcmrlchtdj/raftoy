@@ -49,7 +49,8 @@ type Server struct {
 	matchIndex map[NodeID]LogID
 
 	// volatile on candidate
-	votedForMe int
+	votedForMe  int
+	preVoteTerm TermID
 
 	// tick
 	tickSpan             time.Duration
@@ -79,6 +80,7 @@ func NewServer(addr string, peers []string) *Server {
 		nextIndex:            nil,
 		matchIndex:           nil,
 		votedForMe:           0,
+		preVoteTerm:          0,
 		tickSpan:             DefaultTickSpan,
 		heartbeatTimeoutTick: DefaultHeartbeatTimeoutTick,
 		electionTimeoutTick:  randomElectionTimeoutTick(),
@@ -167,12 +169,16 @@ func (s *Server) loopEvent() {
 				evt.Resp <- s.onReqAppendEntries(e)
 			case *rpc.ReqRequestVote:
 				evt.Resp <- s.onReqRequestVote(e)
+			case *rpc.ReqPreVote:
+				evt.Resp <- s.onReqPreVote(e)
 
 			// receive broadcast response
 			case evtRespRequestVote:
 				s.onRespRequestVote(e)
 			case evtRespAppendEntries:
 				s.onRespAppendEntries(e)
+			case evtRespPreVote:
+				s.onRespPreVote(e)
 			}
 		}
 	}
@@ -187,13 +193,15 @@ func (s *Server) onTimeoutTick() {
 		if s.electionTimeoutTick <= 0 {
 			s.resetElectronTimeoutTick()
 			s.becomeCandidate()
-			s.startElection()
+			s.preVoteTerm = s.currentTerm + 1
+			s.broadcastPreVote()
 		}
 	case Candidate:
 		s.electionTimeoutTick--
 		if s.electionTimeoutTick <= 0 {
 			s.resetElectronTimeoutTick()
-			s.startElection()
+			s.preVoteTerm++
+			s.broadcastPreVote()
 		}
 	case Leader:
 		s.heartbeatTimeoutTick--
@@ -327,6 +335,38 @@ func (s *Server) broadcastRequestVote() {
 				return
 			}
 			s.DispatchEvent(MakeEvent(evtRespRequestVote{peer, req, resp}))
+		}()
+	}
+}
+
+func (s *Server) broadcastPreVote() {
+	fmt.Printf("%v broadcastPreVote\n", s.getInfo())
+
+	s.votedForMe = 1
+
+	lastLog := s.log[len(s.log)-1]
+	req := &rpc.ReqPreVote{
+		PreVoteTerm:  s.preVoteTerm,
+		CandidateId:  s.myself,
+		LastLogIndex: lastLog.Index,
+		LastLogTerm:  lastLog.Term,
+	}
+
+	for i := range s.peers {
+		peer := s.peers[i]
+		if peer == s.myself {
+			continue
+		}
+		client, err := s.getPeerClient(peer)
+		if err != nil {
+			continue
+		}
+		go func() {
+			resp, err := client.PreVote(context.Background(), req)
+			if err != nil {
+				return
+			}
+			s.DispatchEvent(MakeEvent(evtRespPreVote{peer, req, resp}))
 		}()
 	}
 }
@@ -547,6 +587,72 @@ func (s *Server) onRespAppendEntries(e evtRespAppendEntries) {
 		}
 
 	case Candidate, Follower:
+		if e.resp.Term > s.currentTerm {
+			s.becomeFollower(e.resp.Term, "")
+		}
+	}
+}
+
+///
+
+func (s *Server) onReqPreVote(req *rpc.ReqPreVote) *rpc.RespPreVote {
+	resp := new(rpc.RespPreVote)
+	resp.Term = s.currentTerm
+
+	defer func() {
+		if resp.Success {
+			fmt.Printf("%v grant PreVote [peer=%v,term=%v,logT=%v,logI=%v]\n",
+				s.getInfo(), req.CandidateId, req.PreVoteTerm, req.LastLogTerm, req.LastLogIndex)
+		} else {
+			fmt.Printf("%v reject PreVote [peer=%v,term=%v,logT=%v,logI=%v]\n",
+				s.getInfo(), req.CandidateId, req.PreVoteTerm, req.LastLogTerm, req.LastLogIndex)
+		}
+	}()
+
+	if req.PreVoteTerm < s.currentTerm {
+		resp.Success = false
+		return resp
+	}
+
+	lastLog := s.log[len(s.log)-1]
+
+	// compare term
+	if lastLog.Term > req.LastLogTerm {
+		resp.Success = false
+		return resp
+	} else if lastLog.Term < req.LastLogTerm {
+		resp.Success = true
+		return resp
+	}
+
+	// compare log length
+	if lastLog.Index <= req.LastLogIndex {
+		resp.Success = true
+		return resp
+	} else {
+		resp.Success = false
+		return resp
+	}
+}
+
+///
+
+func (s *Server) onRespPreVote(e evtRespPreVote) {
+	switch s.role {
+	case Candidate:
+		if e.resp.Term > s.currentTerm {
+			s.becomeFollower(e.resp.Term, "")
+			return
+		}
+		if e.req.PreVoteTerm == s.preVoteTerm && e.resp.Success {
+			cnt := s.votedForMe + 1
+			if cnt >= (len(s.peers)/2 + 1) {
+				s.preVoteTerm++
+				s.startElection()
+			}
+		}
+
+	case Leader, Follower:
 		if e.resp.Term > s.currentTerm {
 			s.becomeFollower(e.resp.Term, "")
 		}

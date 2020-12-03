@@ -24,6 +24,12 @@ type evtRespRequestVote struct {
 	resp *rpc.RespRequestVote
 }
 
+type evtRespPreVote struct {
+	peer string
+	req  *rpc.ReqPreVote
+	resp *rpc.RespPreVote
+}
+
 type evtRespAppendEntries struct {
 	peer string
 	req  *rpc.ReqAppendEntries

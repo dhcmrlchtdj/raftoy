@@ -69,7 +69,8 @@ message RespRequestVote {
 ///
 
 message ReqPreVote {
-    uint64 term = 1;
+    uint64 preVoteTerm = 1;
+    string CandidateId = 2;
     uint64 lastLogIndex = 3;
     uint64 lastLogTerm = 4;
 }
