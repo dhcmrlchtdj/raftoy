@@ -55,7 +55,9 @@ type Server struct {
 	electionTimeoutTick  int
 
 	// event
-	eventhub chan *Event
+	eventhub         chan *Event
+	peerChannel      map[NodeID](chan struct{})
+	peerChannelClose map[NodeID](chan struct{})
 
 	// stop
 	quitSignal chan struct{}
@@ -82,9 +84,39 @@ func NewServer(addr string, peers []string) *Server {
 		heartbeatTimeoutTick: DefaultHeartbeatTimeoutTick,
 		electionTimeoutTick:  randomElectionTimeoutTick(),
 		eventhub:             make(chan *Event),
+		peerChannel:          nil,
+		peerChannelClose:     nil,
 		quitSignal:           make(chan struct{}),
 	}
+	s.setupPeerChannel()
 	return &s
+}
+
+func (s *Server) setupPeerChannel() {
+	s.peerChannel = make(map[string]chan struct{})
+	s.peerChannelClose = make(map[string]chan struct{})
+	for i := range s.peers {
+		peer := s.peers[i]
+		if peer == s.myself {
+			continue
+		}
+		msgC := make(chan struct{}, 1)
+		closeC := make(chan struct{})
+		go func() {
+			for {
+				select {
+				case <-s.quitSignal:
+					return
+				case <-closeC:
+					return
+				case <-msgC:
+					s.DispatchEvent(MakeEvent(evtPrepareAppendEntries{peer}))
+				}
+			}
+		}()
+		s.peerChannel[peer] = msgC
+		s.peerChannelClose[peer] = closeC
+	}
 }
 
 func (s *Server) getInfo() string {
@@ -158,8 +190,9 @@ func (s *Server) loopEvent() {
 			case evtTick:
 				s.onTimeoutTick()
 			case evtCommitIndexUpdated:
-				// response to client read/write
 				s.onCommitIndexUpdate()
+			case evtPrepareAppendEntries:
+				s.onPrepareAppendEntries(e.peer)
 
 			// receive rpc request
 			case *rpc.ReqAppendEntries:
@@ -170,7 +203,6 @@ func (s *Server) loopEvent() {
 				evt.Resp <- s.onReqPreVote(e)
 			case *rpc.ReqTimeoutNow:
 				evt.Resp <- s.onReqTimeoutNow(e)
-
 			// receive broadcast response
 			case evtRespRequestVote:
 				s.onRespRequestVote(e)
@@ -178,6 +210,10 @@ func (s *Server) loopEvent() {
 				s.onRespAppendEntries(e)
 			case evtRespPreVote:
 				s.onRespPreVote(e)
+
+			// client
+			case *rpc.ReqRegisterClient:
+				s.onReqRegisterClient(e, evt.Resp)
 			}
 		}
 	}

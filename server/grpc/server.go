@@ -105,12 +105,12 @@ func (s *server) RemoveServer(ctx context.Context, req *rpc.ReqRemoveServer) (*r
 
 ///
 
-func (s *server) RegisterClient(ctx context.Context, req *rpc.ReqRegisterClient) (*rpc.RespClient, error) {
+func (s *server) RegisterClient(ctx context.Context, req *rpc.ReqRegisterClient) (*rpc.RespRegisterClient, error) {
 	resp := s.dispatch(req)
 	if resp == nil {
 		return nil, errors.New("nil")
 	} else {
-		return resp.(*rpc.RespClient), nil
+		return resp.(*rpc.RespRegisterClient), nil
 	}
 }
 

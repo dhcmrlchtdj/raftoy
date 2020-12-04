@@ -72,22 +72,6 @@ func (s *Server) becomeLeader() {
 	s.broadcastHeartbeat()
 }
 
-func (s *Server) updateCommitIndex() {
-	matchIdx := []int{}
-	for _, i := range s.matchIndex {
-		matchIdx = append(matchIdx, int(i))
-	}
-	sort.Ints(matchIdx)
-	for i := len(matchIdx) / 2; i >= 0; i-- {
-		idx := uint64(matchIdx[i])
-		if idx > s.commitIndex && s.log[idx].Index == s.currentTerm {
-			s.commitIndex = idx
-			go s.DispatchEvent(MakeEvent(evtCommitIndexUpdated{}))
-			break
-		}
-	}
-}
-
 func (s *Server) resetFollowerIndex() {
 	s.nextIndex = make(map[string]uint64)
 	s.matchIndex = make(map[string]uint64)
@@ -117,6 +101,24 @@ func (s *Server) startElection() {
 	s.votedForMe = 1
 	fmt.Printf("%v startElection\n", s.getInfo())
 	s.broadcastRequestVote()
+}
+
+func (s *Server) updateCommitIndex() {
+	if len(s.peers) == 1 {
+		// FIXME
+		return
+	}
+
+	matchIdx := []int{}
+	for _, v := range s.matchIndex {
+		matchIdx = append(matchIdx, int(v))
+	}
+	sort.Ints(matchIdx)
+	confirmed := uint64(matchIdx[len(matchIdx)/2])
+	if confirmed > s.commitIndex && s.log[confirmed].Term == s.currentTerm {
+		s.commitIndex = confirmed
+		go s.DispatchEvent(MakeEvent(evtCommitIndexUpdated{}))
+	}
 }
 
 ///
@@ -204,11 +206,17 @@ func (s *Server) broadcastHeartbeat() {
 		if peer == s.myself {
 			continue
 		}
-		s.sendAppendEntries(peer, 0)
+		s.prepareAppendEntries(peer)
 	}
 }
 
-func (s *Server) sendAppendEntries(peer string, size int) {
+func (s *Server) prepareAppendEntries(peer string) {
+	if len(s.peerChannel[peer]) == 0 {
+		s.peerChannel[peer] <- struct{}{}
+	}
+}
+
+func (s *Server) onPrepareAppendEntries(peer string) {
 	client, err := s.getPeerClient(peer)
 	if err != nil {
 		return
@@ -216,7 +224,8 @@ func (s *Server) sendAppendEntries(peer string, size int) {
 	prevIdx := s.nextIndex[peer] - 1
 	prevLog := s.log[prevIdx]
 
-	entries := make([]*rpc.Entry, size)
+	size := 1
+	entries := make([]*rpc.Entry, 0)
 	for i := 1; i <= size && int(prevIdx)+i < len(s.log); i++ {
 		entry := s.log[int(prevIdx)+i]
 		rpcEntry := rpc.Entry{Term: entry.Term, Index: entry.Index, Command: entry.Command}
@@ -404,11 +413,11 @@ func (s *Server) onRespAppendEntries(e evtRespAppendEntries) {
 				s.nextIndex[e.peer] = s.nextIndex[e.peer] + uint64(size)
 				s.matchIndex[e.peer] = e.req.Entries[len(e.req.Entries)-1].Index
 				s.updateCommitIndex()
-				s.sendAppendEntries(e.peer, size)
+				s.prepareAppendEntries(e.peer)
 			}
 		} else {
 			s.nextIndex[e.peer]--
-			s.sendAppendEntries(e.peer, len(e.req.Entries))
+			s.prepareAppendEntries(e.peer)
 		}
 
 	case Candidate, Follower:

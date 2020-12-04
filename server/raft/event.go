@@ -14,9 +14,15 @@ func MakeEvent(payload interface{}) *Event {
 	}
 }
 
+///
+
 type evtTick struct{}
 
 type evtCommitIndexUpdated struct{}
+
+type evtPrepareAppendEntries struct {
+	peer string
+}
 
 type evtRespRequestVote struct {
 	peer string
