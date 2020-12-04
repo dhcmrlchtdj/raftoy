@@ -4,8 +4,9 @@
 - [x] TimeoutNow RPC
 - [ ] AddServer RPC
 - [ ] RemoveServer RPC
-- [ ] RegisterClient RPC
-- [ ] ClientRequest RPC
-- [ ] ClientQuery RPC
+- [x] RegisterClient RPC
+- [x] ClientRequest RPC
+- [x] ClientQuery RPC
+- [ ] exactly-once client interaction
 - [ ] Persistence
 - [ ] Log Compaction

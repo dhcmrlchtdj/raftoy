@@ -28,7 +28,7 @@ func (s *Server) onReqRegisterClient(req *rpc.ReqRegisterClient, respC chan inte
 				if committed {
 					resp.Status = rpc.RespRegisterClient_OK
 					resp.ClientId = &cid
-					// FIXME client session
+					// TODO client session
 				} else {
 					resp.Status = rpc.RespRegisterClient_NOT_LEADER
 					if s.votedFor != "" {
@@ -93,7 +93,6 @@ func (s *Server) onReqClientRequest(req *rpc.ReqClientRequest, respC chan interf
 		respC <- resp
 	} else {
 		_, commitC := s.appendLog(req.Command)
-		// FIXME session expired
 		go func() {
 			select {
 			case <-s.quitSignal:

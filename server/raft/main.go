@@ -222,7 +222,7 @@ func (s *Server) loopEvent() {
 			case evtTick:
 				s.onTimeoutTick()
 			case evtCommitIndexUpdated:
-				s.onCommitIndexUpdate()
+				s.onCommitIndexUpdate(e)
 			case evtPrepareAppendEntries:
 				s.onPrepareAppendEntries(e.peer)
 

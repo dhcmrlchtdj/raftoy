@@ -45,7 +45,7 @@ func (s *Server) applyCommittedLog() {
 		cmd := log.Command
 		if cmd == "no-op" {
 		} else if cmd == "register-client" {
-			// FIXME
+			// TODO client session
 		} else if strings.HasPrefix(cmd, "set:") {
 			kv := cmd[4:]
 			sepIdx := strings.IndexByte(kv, ':')
@@ -61,7 +61,7 @@ func (s *Server) applyCommittedLog() {
 	}
 }
 
-func (s *Server) onCommitIndexUpdate() {
+func (s *Server) onCommitIndexUpdate(evtCommitIndexUpdated) {
 	s.applyCommittedLog()
 	for logId, ch := range s.waitingCommit {
 		if logId <= s.commitIndex {
@@ -115,10 +115,10 @@ func (s *Server) becomeLeader() {
 		panic("become leader")
 	}
 	s.role = Leader
+	fmt.Printf("%v become leader\n", s.getInfo())
 	s.resetFollowerIndex()
 	s.resetHeartbeatTimeoutTick()
 	s.appendLog("no-op")
-	fmt.Printf("%v become leader\n", s.getInfo())
 }
 
 func (s *Server) resetFollowerIndex() {
@@ -154,7 +154,7 @@ func (s *Server) startElection() {
 
 func (s *Server) updateCommitIndex() {
 	if len(s.peers) == 1 {
-		// FIXME
+		s.commitIndex = s.getLastLog().Index
 		return
 	}
 
@@ -195,6 +195,11 @@ func (s *Server) getPeerClient(peer string) (rpc.RaftRpcClient, error) {
 func (s *Server) broadcastRequestVote() {
 	fmt.Printf("%v broadcastRequestVote\n", s.getInfo())
 
+	if len(s.peers) == 1 {
+		s.becomeLeader()
+		return
+	}
+
 	lastLog := s.getLastLog()
 	req := &rpc.ReqRequestVote{
 		Term:         s.currentTerm,
@@ -224,6 +229,11 @@ func (s *Server) broadcastRequestVote() {
 
 func (s *Server) broadcastPreVote() {
 	fmt.Printf("%v broadcastPreVote\n", s.getInfo())
+
+	if len(s.peers) == 1 {
+		s.startElection()
+		return
+	}
 
 	s.votedForMe = 1
 
@@ -256,6 +266,11 @@ func (s *Server) broadcastPreVote() {
 
 func (s *Server) broadcastAppendEntries() {
 	fmt.Printf("%v broadcastAppendEntries\n", s.getInfo())
+
+	if len(s.peers) == 1 {
+		s.updateCommitIndex()
+		return
+	}
 
 	for i := range s.peers {
 		peer := s.peers[i]

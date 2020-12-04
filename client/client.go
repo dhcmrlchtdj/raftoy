@@ -82,7 +82,7 @@ func (c *Client) clientRequest(cmd string) {
 		resp, err := c.client.ClientRequest(context.Background(),
 			&rpc.ReqClientRequest{
 				ClientId:    c.clientId,
-				SequenceNum: c.sequenceNum, // FIXME
+				SequenceNum: c.sequenceNum,
 				Command:     cmd,
 			})
 		if err != nil {
