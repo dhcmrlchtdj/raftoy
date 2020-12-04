@@ -17,7 +17,9 @@ func main() {
 
 	c := client.New(cluster)
 	c.Conn()
-	println("client connect")
+	println("client connected")
+	val := c.Query("key")
+	println("query key", val)
 
 	time.Sleep(5 * time.Minute)
 	closeS1()

@@ -10,7 +10,7 @@ type Store struct {
 	kv map[string]string
 }
 
-func NewStore() *Store {
+func New() *Store {
 	return new(Store)
 }
 

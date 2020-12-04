@@ -55,3 +55,20 @@ func (c *Client) Conn() {
 	}
 	panic("can't connect to cluster")
 }
+
+func (c *Client) Query(key string) *string {
+	maxRetry := 2
+	for maxRetry > 0 {
+		maxRetry--
+		resp, err := c.client.ClientQuery(context.Background(), &rpc.ReqClientQuery{Query: key})
+		if err != nil {
+			panic(err)
+		}
+		if resp.Status == rpc.RespClient_OK {
+			return resp.Response
+		} else {
+			c.Conn()
+		}
+	}
+	panic("can't connect to cluster")
+}

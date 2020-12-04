@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dhcmrlchtdj/raftoy/rpc"
+	"github.com/dhcmrlchtdj/raftoy/server/store"
 )
 
 ///
@@ -55,6 +56,9 @@ type Server struct {
 	// volatile on candidate
 	votedForMe  int
 	preVoteTerm TermID
+
+	// state machine
+	store *store.Store
 
 	// tick
 	tickSpan             time.Duration
@@ -109,6 +113,7 @@ func NewServer(addr string, peers []string) *Server {
 		matchIndex:           nil,
 		votedForMe:           0,
 		preVoteTerm:          0,
+		store: store.New(),
 		tickSpan:             DefaultTickSpan,
 		heartbeatTimeoutTick: DefaultHeartbeatTimeoutTick,
 		electionTimeoutTick:  randomElectionTimeoutTick(),
@@ -241,6 +246,8 @@ func (s *Server) loopEvent() {
 			// client
 			case *rpc.ReqRegisterClient:
 				s.onReqRegisterClient(e, evt.Resp)
+			case *rpc.ReqClientQuery:
+				s.onReqClientQuery(e, evt.Resp)
 			}
 		}
 	}
