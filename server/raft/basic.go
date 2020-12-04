@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"google.golang.org/grpc"
 
@@ -39,8 +40,24 @@ func (s *Server) onTimeoutTick() {
 }
 
 func (s *Server) applyCommittedLog() {
-	if s.commitIndex > s.lastApplied {
-		// TODO apply log to state machine
+	for s.commitIndex > s.lastApplied {
+		log := s.log[s.lastApplied+1]
+		cmd := log.Command
+		if cmd == "no-op" {
+		} else if cmd == "register-client" {
+			// FIXME
+		} else if strings.HasPrefix(cmd, "set:") {
+			kv := cmd[4:]
+			sepIdx := strings.IndexByte(kv, ':')
+			k := kv[:sepIdx]
+			v := kv[sepIdx+1:]
+			s.store.Set(k, v)
+		} else if strings.HasPrefix(cmd, "del:") {
+			s.store.Del(cmd[4:])
+		} else {
+			panic("unkown command " + cmd)
+		}
+		s.lastApplied++
 	}
 }
 
@@ -100,7 +117,7 @@ func (s *Server) becomeLeader() {
 	s.role = Leader
 	s.resetFollowerIndex()
 	s.resetHeartbeatTimeoutTick()
-	s.appendLog("no-op") // FIXME
+	s.appendLog("no-op")
 	fmt.Printf("%v become leader\n", s.getInfo())
 }
 
@@ -405,9 +422,8 @@ func (s *Server) onReqAppendEntries(req *rpc.ReqAppendEntries) *rpc.RespAppendEn
 			req.LeaderCommit,
 			req.Entries[len(req.Entries)-1].Index,
 		)
+		s.applyCommittedLog()
 	}
-
-	s.applyCommittedLog()
 
 	return resp
 }

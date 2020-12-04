@@ -113,7 +113,7 @@ func NewServer(addr string, peers []string) *Server {
 		matchIndex:           nil,
 		votedForMe:           0,
 		preVoteTerm:          0,
-		store: store.New(),
+		store:                store.New(),
 		tickSpan:             DefaultTickSpan,
 		heartbeatTimeoutTick: DefaultHeartbeatTimeoutTick,
 		electionTimeoutTick:  randomElectionTimeoutTick(),
@@ -248,6 +248,8 @@ func (s *Server) loopEvent() {
 				s.onReqRegisterClient(e, evt.Resp)
 			case *rpc.ReqClientQuery:
 				s.onReqClientQuery(e, evt.Resp)
+			case *rpc.ReqClientRequest:
+				s.onReqClientRequest(e, evt.Resp)
 			}
 		}
 	}

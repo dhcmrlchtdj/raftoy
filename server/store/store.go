@@ -11,7 +11,10 @@ type Store struct {
 }
 
 func New() *Store {
-	return new(Store)
+	s := Store{
+		kv: make(map[string]string),
+	}
+	return &s
 }
 
 func (s *Store) Get(key string) (string, bool) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/dhcmrlchtdj/raftoy/client"
@@ -17,11 +18,15 @@ func main() {
 
 	c := client.New(cluster)
 	c.Conn()
-	println("client connected")
-	val := c.Query("key")
-	println("query key", val)
+	fmt.Printf("connect to cluster")
+	c.Set("x", "1")
+	val := c.Get("x")
+	fmt.Printf("GET x=%v", *val)
+	c.Del("x")
+	val = c.Get("x")
+	fmt.Printf("GET x=%v", val)
 
-	time.Sleep(5 * time.Minute)
+	time.Sleep(5 * time.Second)
 	closeS1()
 	closeS2()
 	closeS3()
