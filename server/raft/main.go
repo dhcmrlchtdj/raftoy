@@ -57,9 +57,8 @@ type Server struct {
 	// event
 	eventhub chan *Event
 
-	peerChannel      map[NodeID](chan struct{})
-	peerChannelClose map[NodeID](chan struct{})
-	waitingCommit    map[LogID](chan bool)
+	peerChannel   map[NodeID](chan struct{})
+	waitingCommit map[LogID](chan bool)
 
 	// stop
 	quitSignal chan struct{}
@@ -75,7 +74,7 @@ func NewServer(addr string, peers []string) *Server {
 		peerConn:             make(map[string]rpc.RaftRpcClient),
 		currentTerm:          0,
 		votedFor:             "",
-		log:                  []LogEntry{{Term: 0, Index: 0, Command: ""}},
+		log:                  []LogEntry{{Term: 0, Index: 0, Command: "no-op"}},
 		commitIndex:          0,
 		lastApplied:          0,
 		nextIndex:            nil,
@@ -86,9 +85,8 @@ func NewServer(addr string, peers []string) *Server {
 		heartbeatTimeoutTick: DefaultHeartbeatTimeoutTick,
 		electionTimeoutTick:  randomElectionTimeoutTick(),
 		eventhub:             make(chan *Event),
-		peerChannel:          nil,
-		peerChannelClose:     nil,
-		waitingCommit:        nil,
+		peerChannel:          make(map[string]chan struct{}),
+		waitingCommit:        make(map[uint64]chan bool),
 		quitSignal:           make(chan struct{}),
 	}
 	s.setupPeerChannel()
@@ -96,21 +94,16 @@ func NewServer(addr string, peers []string) *Server {
 }
 
 func (s *Server) setupPeerChannel() {
-	s.peerChannel = make(map[string]chan struct{})
-	s.peerChannelClose = make(map[string]chan struct{})
 	for i := range s.peers {
 		peer := s.peers[i]
 		if peer == s.myself {
 			continue
 		}
 		msgC := make(chan struct{}, 1)
-		closeC := make(chan struct{})
 		go func() {
 			for {
 				select {
 				case <-s.quitSignal:
-					return
-				case <-closeC:
 					return
 				case <-msgC:
 					s.DispatchEvent(MakeEvent(evtPrepareAppendEntries{peer}))
@@ -118,7 +111,6 @@ func (s *Server) setupPeerChannel() {
 			}
 		}()
 		s.peerChannel[peer] = msgC
-		s.peerChannelClose[peer] = closeC
 	}
 }
 

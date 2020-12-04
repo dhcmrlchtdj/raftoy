@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dhcmrlchtdj/raftoy/rpc"
 	"google.golang.org/grpc"
+
+	"github.com/dhcmrlchtdj/raftoy/rpc"
 )
 
 ///
@@ -98,7 +99,6 @@ func (s *Server) becomeLeader() {
 	}
 	s.role = Leader
 	s.resetFollowerIndex()
-	s.waitingCommit = make(map[uint64]chan bool)
 	s.resetHeartbeatTimeoutTick()
 	s.appendLog("no-op") // FIXME
 	fmt.Printf("%v become leader\n", s.getInfo())
@@ -154,8 +154,9 @@ func (s *Server) updateCommitIndex() {
 }
 
 func (s *Server) clearLeaderState() {
-	for _, ch := range s.waitingCommit {
+	for logId, ch := range s.waitingCommit {
 		ch <- false
+		delete(s.waitingCommit, logId)
 	}
 }
 
@@ -241,14 +242,14 @@ func (s *Server) broadcastAppendEntries() {
 
 	for i := range s.peers {
 		peer := s.peers[i]
-		if peer == s.myself {
-			continue
-		}
 		s.prepareAppendEntries(peer)
 	}
 }
 
 func (s *Server) prepareAppendEntries(peer string) {
+	if peer == s.myself {
+		return
+	}
 	if len(s.peerChannel[peer]) == 0 {
 		s.peerChannel[peer] <- struct{}{}
 	}
