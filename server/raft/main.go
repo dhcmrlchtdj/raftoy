@@ -55,9 +55,11 @@ type Server struct {
 	electionTimeoutTick  int
 
 	// event
-	eventhub         chan *Event
+	eventhub chan *Event
+
 	peerChannel      map[NodeID](chan struct{})
 	peerChannelClose map[NodeID](chan struct{})
+	waitingCommit    map[LogID](chan bool)
 
 	// stop
 	quitSignal chan struct{}
@@ -86,6 +88,7 @@ func NewServer(addr string, peers []string) *Server {
 		eventhub:             make(chan *Event),
 		peerChannel:          nil,
 		peerChannelClose:     nil,
+		waitingCommit:        nil,
 		quitSignal:           make(chan struct{}),
 	}
 	s.setupPeerChannel()
@@ -119,8 +122,12 @@ func (s *Server) setupPeerChannel() {
 	}
 }
 
+func (s *Server) getLastLog() LogEntry {
+	return s.log[len(s.log)-1]
+}
+
 func (s *Server) getInfo() string {
-	lastLog := s.log[len(s.log)-1]
+	lastLog := s.getLastLog()
 	r := ""
 	switch s.role {
 	case Leader:

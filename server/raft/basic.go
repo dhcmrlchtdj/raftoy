@@ -32,25 +32,56 @@ func (s *Server) onTimeoutTick() {
 		s.heartbeatTimeoutTick--
 		if s.heartbeatTimeoutTick <= 0 {
 			s.resetHeartbeatTimeoutTick()
-			s.broadcastHeartbeat()
+			s.broadcastAppendEntries()
 		}
 	}
 }
 
+func (s *Server) applyCommittedLog() {
+	if s.commitIndex > s.lastApplied {
+		// TODO apply log to state machine
+	}
+}
+
 func (s *Server) onCommitIndexUpdate() {
-	// TODO
+	s.applyCommittedLog()
+	for logId, ch := range s.waitingCommit {
+		if logId <= s.commitIndex {
+			ch <- true
+			delete(s.waitingCommit, logId)
+		}
+	}
+}
+
+func (s *Server) appendLog(command string) (*LogEntry, chan bool) {
+	newLog := LogEntry{
+		Term:    s.currentTerm,
+		Index:   uint64(len(s.log)),
+		Command: command,
+	}
+	s.log = append(s.log, newLog)
+	s.broadcastAppendEntries()
+
+	commitC := make(chan bool, 1)
+	s.waitingCommit[newLog.Index] = commitC
+
+	return &newLog, commitC
 }
 
 ///
 
 func (s *Server) becomeFollower(term TermID, votedFor string) {
-	if s.role != Follower {
+	prevRole := s.role
+	s.currentTerm = term
+	s.votedFor = votedFor
+	s.role = Follower
+	s.resetElectronTimeoutTick()
+	if prevRole == Leader {
+		s.clearLeaderState()
+	}
+	if prevRole != Follower {
 		fmt.Printf("%v become follower\n", s.getInfo())
 	}
-	s.currentTerm = term
-	s.role = Follower
-	s.votedFor = votedFor
-	s.resetElectronTimeoutTick()
 }
 
 func (s *Server) becomeCandidate() {
@@ -66,17 +97,18 @@ func (s *Server) becomeLeader() {
 		panic("become leader")
 	}
 	s.role = Leader
-	fmt.Printf("%v become leader\n", s.getInfo())
 	s.resetFollowerIndex()
+	s.waitingCommit = make(map[uint64]chan bool)
 	s.resetHeartbeatTimeoutTick()
-	s.broadcastHeartbeat()
+	s.appendLog("no-op") // FIXME
+	fmt.Printf("%v become leader\n", s.getInfo())
 }
 
 func (s *Server) resetFollowerIndex() {
 	s.nextIndex = make(map[string]uint64)
 	s.matchIndex = make(map[string]uint64)
 
-	lastLog := s.log[len(s.log)-1]
+	lastLog := s.getLastLog()
 	for i := range s.peers {
 		peer := s.peers[i]
 		if peer == s.myself {
@@ -121,6 +153,12 @@ func (s *Server) updateCommitIndex() {
 	}
 }
 
+func (s *Server) clearLeaderState() {
+	for _, ch := range s.waitingCommit {
+		ch <- false
+	}
+}
+
 ///
 
 func (s *Server) getPeerClient(peer string) (rpc.RaftRpcClient, error) {
@@ -139,7 +177,7 @@ func (s *Server) getPeerClient(peer string) (rpc.RaftRpcClient, error) {
 func (s *Server) broadcastRequestVote() {
 	fmt.Printf("%v broadcastRequestVote\n", s.getInfo())
 
-	lastLog := s.log[len(s.log)-1]
+	lastLog := s.getLastLog()
 	req := &rpc.ReqRequestVote{
 		Term:         s.currentTerm,
 		CandidateId:  s.myself,
@@ -171,7 +209,7 @@ func (s *Server) broadcastPreVote() {
 
 	s.votedForMe = 1
 
-	lastLog := s.log[len(s.log)-1]
+	lastLog := s.getLastLog()
 	req := &rpc.ReqPreVote{
 		PreVoteTerm:  s.preVoteTerm,
 		CandidateId:  s.myself,
@@ -198,8 +236,8 @@ func (s *Server) broadcastPreVote() {
 	}
 }
 
-func (s *Server) broadcastHeartbeat() {
-	fmt.Printf("%v broadcastHeartbeat\n", s.getInfo())
+func (s *Server) broadcastAppendEntries() {
+	fmt.Printf("%v broadcastAppendEntries\n", s.getInfo())
 
 	for i := range s.peers {
 		peer := s.peers[i]
@@ -276,7 +314,7 @@ func (s *Server) onReqRequestVote(req *rpc.ReqRequestVote) *rpc.RespRequestVote 
 	}
 
 	if s.votedFor == "" || s.votedFor == req.CandidateId {
-		lastLog := s.log[len(s.log)-1]
+		lastLog := s.getLastLog()
 
 		// compare term
 		if lastLog.Term > req.LastLogTerm {
@@ -368,9 +406,7 @@ func (s *Server) onReqAppendEntries(req *rpc.ReqAppendEntries) *rpc.RespAppendEn
 		)
 	}
 
-	if s.commitIndex > s.lastApplied {
-		// TODO apply log to state machine
-	}
+	s.applyCommittedLog()
 
 	return resp
 }
@@ -413,7 +449,9 @@ func (s *Server) onRespAppendEntries(e evtRespAppendEntries) {
 				s.nextIndex[e.peer] = s.nextIndex[e.peer] + uint64(size)
 				s.matchIndex[e.peer] = e.req.Entries[len(e.req.Entries)-1].Index
 				s.updateCommitIndex()
-				s.prepareAppendEntries(e.peer)
+				if s.matchIndex[e.peer] < s.getLastLog().Index {
+					s.prepareAppendEntries(e.peer)
+				}
 			}
 		} else {
 			s.nextIndex[e.peer]--
@@ -448,7 +486,7 @@ func (s *Server) onReqPreVote(req *rpc.ReqPreVote) *rpc.RespPreVote {
 		return resp
 	}
 
-	lastLog := s.log[len(s.log)-1]
+	lastLog := s.getLastLog()
 
 	// compare term
 	if lastLog.Term > req.LastLogTerm {
@@ -495,7 +533,7 @@ func (s *Server) onRespPreVote(e evtRespPreVote) {
 
 ///
 
-func (s *Server) onReqTimeoutNow(req *rpc.ReqTimeoutNow) *rpc.RespTimeoutNow {
+func (s *Server) onReqTimeoutNow(*rpc.ReqTimeoutNow) *rpc.RespTimeoutNow {
 	resp := new(rpc.RespTimeoutNow)
 	resp.Success = true
 	s.electionTimeoutTick = 0
