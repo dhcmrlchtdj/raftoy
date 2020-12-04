@@ -1,8 +1,11 @@
 package raft
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
+
+	// "math/rand"
 	"sync"
 	"time"
 
@@ -17,9 +20,13 @@ const (
 )
 
 func randomElectionTimeoutTick() int { // [800ms, 1000ms)
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	// return [40, 50)
-	return 40 + r.Intn(10)
+	// r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	// return 40 + r.Intn(10) // [40, 50)
+	n, err := rand.Int(rand.Reader, big.NewInt(10))
+	if err != nil {
+		panic(err)
+	}
+	return 40 + n.Sign() // [40, 50)
 }
 
 ///
@@ -64,6 +71,27 @@ type Server struct {
 	quitSignal chan struct{}
 	quitOnce   sync.Once
 	quitWait   sync.WaitGroup
+}
+
+type Role int32
+
+const (
+	Follower  Role = 1
+	Candidate Role = 2
+	Leader    Role = 3
+)
+
+type (
+	ClientID = string
+	NodeID   = string
+	TermID   = uint64
+	LogID    = uint64
+)
+
+type LogEntry struct {
+	Term    TermID
+	Index   LogID
+	Command string
 }
 
 func NewServer(addr string, peers []string) *Server {

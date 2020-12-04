@@ -540,3 +540,12 @@ func (s *Server) onReqTimeoutNow(*rpc.ReqTimeoutNow) *rpc.RespTimeoutNow {
 	s.electionTimeoutTick = 0
 	return resp
 }
+
+///
+
+func minUint64(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+	return b
+}
